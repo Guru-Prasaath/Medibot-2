@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synapse Health AI - Medical Chatbot</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f7fafc;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --border-color: #e2e8f0;
+            --header-bg: #ffffff;
+            --input-bg: #f1f5f9;
+        }
+
+        html.dark {
+            --bg-primary: #1a202c;
+            --bg-secondary: #2d3748;
+            --text-primary: #e2e8f0;
+            --text-secondary: #a0aec0;
+            --border-color: #4a5568;
+            --header-bg: #2d3748;
+            --input-bg: #4a5568;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Custom scrollbar */
+        #chat-window::-webkit-scrollbar { width: 6px; }
+        #chat-window::-webkit-scrollbar-track { background: transparent; }
+        #chat-window::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        html.dark #chat-window::-webkit-scrollbar-thumb { background: #4a5568; }
+
+        /* Typing indicator */
+        .typing-indicator span {
+            height: 8px; width: 8px; background-color: var(--text-secondary);
+            border-radius: 50%; display: inline-block;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+        
+        /* Message animation */
+        .chat-message { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        textarea { resize: none; }
+        
+        /* Markdown styling */
+        .prose ul { list-style-type: disc; padding-left: 1.5rem; }
+        .prose strong { font-weight: 600; }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen">
+
+    <!-- Main Container -->
+    <div class="w-full h-full flex flex-col bg-primary">
+
+        <!-- Header -->
+        <header class="bg-header border-b border-border-color p-4 flex items-center justify-between shadow-sm z-10 flex-shrink-0">
+             <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+                <h1 class="text-xl font-semibold">Synapse Health AI</h1>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="new-chat-btn" title="New Chat" class="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <svg class="w-5 h-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                </button>
+                <button id="theme-toggle" title="Toggle Theme" class="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <svg id="theme-icon-light" class="w-5 h-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    <svg id="theme-icon-dark" class="w-5 h-5 text-text-secondary hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat Window -->
+        <div id="chat-window" class="flex-1 p-6 overflow-y-auto relative">
+             <!-- Welcome Screen -->
+            <div id="welcome-screen" class="h-full flex flex-col items-center justify-center text-center">
+                <div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mb-4">
+                     <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+                <h2 class="text-2xl font-semibold text-text-primary">How can I help you today?</h2>
+            </div>
+            <!-- Messages will be appended here -->
+        </div>
+        
+        <!-- Input Area -->
+        <div class="px-4 pb-4 md:px-6 md:pb-6 bg-primary flex-shrink-0">
+            <div class="max-w-3xl mx-auto">
+                <div id="suggestions-container" class="flex flex-wrap gap-2 mb-2">
+                    <button class="suggestion-btn bg-secondary text-text-secondary text-sm px-3 py-2 rounded-lg border border-border-color hover:bg-border-color transition-colors">How to treat a minor burn?</button>
+                    <button class="suggestion-btn bg-secondary text-text-secondary text-sm px-3 py-2 rounded-lg border border-border-color hover:bg-border-color transition-colors">What are symptoms of dehydration?</button>
+                    <button class="suggestion-btn bg-secondary text-text-secondary text-sm px-3 py-2 rounded-lg border border-border-color hover:bg-border-color transition-colors">Tell me about seasonal allergies.</button>
+                </div>
+
+                <form id="chat-form" class="relative">
+                    <textarea id="message-input" placeholder="Ask about symptoms, conditions, or treatments..." class="w-full px-4 py-3 pr-12 text-text-primary bg-input-bg border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" rows="1"></textarea>
+                    <button type="submit" class="absolute right-3 top-1/2 -translate-y-1/2 bg-blue-600 text-white rounded-lg p-2 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all shadow-md hover:shadow-lg disabled:bg-gray-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </button>
+                </form>
+                <p class="text-xs text-text-secondary text-center mt-2">Synapse Health AI can make mistakes. Consider checking important information.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatWindow = document.getElementById('chat-window');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const suggestionBtns = document.querySelectorAll('.suggestion-btn');
+        const suggestionsContainer = document.getElementById('suggestions-container');
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const submitButton = chatForm.querySelector('button');
+        const themeToggle = document.getElementById('theme-toggle');
+        const newChatBtn = document.getElementById('new-chat-btn');
+
+        /**
+         * Appends a message to the chat window.
+         * @param {string} text - The message text.
+         * @param {string} sender - 'user' or 'ai'.
+         */
+        function displayMessage(text, sender) {
+            const messageWrapper = document.createElement('div');
+            messageWrapper.classList.add('chat-message', 'max-w-3xl', 'mx-auto', 'py-4', 'flex', 'items-start', 'space-x-4');
+            
+            const sanitizedText = text; // Sanitization will happen via Markdown parser
+
+            let messageContent;
+            if (sender === 'user') {
+                 messageContent = `
+                    <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-text-primary">${sanitizedText.replace(/\n/g, '<br>')}</p>
+                    </div>`;
+            } else { // AI message
+                const rawHtml = marked.parse(sanitizedText, { gfm: true, breaks: true });
+                messageContent = `
+                    <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
+                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    </div>
+                    <div class="flex-1 relative group">
+                        <div class="prose text-text-primary">${rawHtml}</div>
+                        <button onclick="copyToClipboard(this)" class="absolute top-0 right-0 p-1 text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        </button>
+                    </div>`;
+            }
+            
+            messageWrapper.innerHTML = messageContent;
+            chatWindow.appendChild(messageWrapper);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+        
+        function copyToClipboard(button) {
+            const messageContainer = button.parentElement.querySelector('.prose');
+            const textToCopy = messageContainer.innerText;
+            navigator.clipboard.writeText(textToCopy);
+
+            const originalIcon = button.innerHTML;
+            button.innerHTML = `<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+            setTimeout(() => {
+                button.innerHTML = originalIcon;
+            }, 1500);
+        }
+
+        function showTypingIndicator() {
+            const typingWrapper = document.createElement('div');
+            typingWrapper.id = 'typing-indicator';
+            typingWrapper.classList.add('chat-message', 'max-w-3xl', 'mx-auto', 'py-4', 'flex', 'items-start', 'space-x-4');
+            typingWrapper.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+                <div class="flex-1 pt-2"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+            chatWindow.appendChild(typingWrapper);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if(indicator) indicator.remove();
+        }
+
+        async function getAIResponse(userInput) {
+            const apiKey = "// ADD YOUR GOOGLE API KEY HERE";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            const systemPrompt = `You are Synapse Health AI, a friendly and empathetic health assistant. Your role is to provide preliminary health information and guidance. You are NOT a doctor. 
+            For any response that could be interpreted as medical advice, you MUST include a clear disclaimer paragraph at the end: '**Disclaimer:** This is for informational purposes only and is not medical advice. Please consult a healthcare professional for a diagnosis.'
+            Prioritize user safety. If a user mentions severe or emergency symptoms (e.g., 'chest pain', 'can't breathe', 'suicidal thoughts', 'severe bleeding'), you must immediately and exclusively respond with a message urging them to contact local emergency services or a medical professional right away. Do not provide any other medical information in that case.
+            Keep your answers concise, well-structured, and easy to understand. Use simple language. Use markdown for formatting like bolding and lists where appropriate.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userInput }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+                return candidate?.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate a response.";
+            } catch (error) {
+                console.error("Error fetching AI response:", error);
+                return "I'm having trouble connecting. Please check your connection or try again.";
+            }
+        }
+
+        async function handleUserMessage(text) {
+            const userInput = text.trim();
+            if (!userInput) return;
+
+            welcomeScreen.classList.add('hidden');
+            suggestionsContainer.classList.add('hidden');
+            displayMessage(userInput, 'user');
+            
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            submitButton.disabled = true;
+
+            showTypingIndicator();
+            const aiResponseText = await getAIResponse(userInput);
+            hideTypingIndicator();
+            displayMessage(aiResponseText, 'ai');
+        }
+        
+        // --- Event Listeners & Initializers ---
+        messageInput.addEventListener('input', () => {
+            messageInput.style.height = 'auto';
+            messageInput.style.height = (messageInput.scrollHeight) + 'px';
+            submitButton.disabled = !messageInput.value.trim();
+        });
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            handleUserMessage(messageInput.value);
+        });
+        
+        suggestionBtns.forEach(btn => {
+            btn.addEventListener('click', () => handleUserMessage(btn.textContent));
+        });
+
+        newChatBtn.addEventListener('click', () => {
+            chatWindow.innerHTML = ''; // Clear messages
+            chatWindow.appendChild(welcomeScreen); // Add welcome screen back
+            welcomeScreen.classList.remove('hidden');
+            suggestionsContainer.classList.remove('hidden');
+        });
+
+        const lightIcon = document.getElementById('theme-icon-light');
+        const darkIcon = document.getElementById('theme-icon-dark');
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            lightIcon.classList.toggle('hidden', isDark);
+            darkIcon.classList.toggle('hidden', !isDark);
+        });
+
+        window.addEventListener('load', () => {
+             submitButton.disabled = true;
+             const savedTheme = localStorage.getItem('theme') || 'light';
+             if (savedTheme === 'dark') {
+                 document.documentElement.classList.add('dark');
+             }
+             lightIcon.classList.toggle('hidden', savedTheme === 'dark');
+             darkIcon.classList.toggle('hidden', savedTheme !== 'dark');
+        });
+
+    </script>
+</body>
+</html>
+
